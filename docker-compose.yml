@@ -1,0 +1,58 @@
+version: "3.2"
+
+## important to set -http.addr and --authrpc.addr 0.0.0.0 to listen on all interfaces
+## containers have diff IP's so default value of localhost wouldn't work, instead
+##    use container name like --execution-endpoint=http://geth:8551
+## Crucial: use absolute path for source/target in bind mount volumes
+
+services:
+  geth:
+    image: ethereum/client-go:stable
+    container_name: geth
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8545:8545"
+      - "127.0.0.1:8546:8546"
+      - "30303:30303"
+    volumes:
+      - type: bind
+        source: /home/<USER>/.ethereum 
+        target: /root/.ethereum
+    command:
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --http
+      - --http.addr=0.0.0.0
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=8551
+      - --authrpc.vhosts=*
+    stop_grace_period: 3m # to avoid unclean shutdown 
+
+  prysm:
+    image: gcr.io/prysmaticlabs/prysm/beacon-chain:stable 
+    container_name: prysm 
+    restart: unless-stopped
+    ports:
+      - "13000:13000/tcp"
+      - "12000:12000/udp"
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - type: bind
+        source: /home/<USER>/.eth2
+        target: /data 
+      - type: bind
+        source: /home/<USER>/.ethereum
+        target: /root/.ethereum
+        read_only: true 
+
+    command:
+      - --mainnet
+      - --datadir=/data
+      - --accept-terms-of-use
+      - --rpc-host=0.0.0.0
+      - --grpc-gateway-host=0.0.0.0
+      - --monitoring-host=0.0.0.0
+      - --execution-endpoint=http://geth:8551
+      - --jwt-secret=/root/.ethereum/geth/jwtsecret
+      - --checkpoint-sync-url=https://beaconstate.info/
+      - --p2p-host-ip=<YOUR_PUBLIC_IP_ADDRESS> ##check yours using curl v4.ident.me
